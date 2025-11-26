@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, Users, Trash2, Plus, X, Save, ChevronLeft, Printer, CheckSquare } from 'lucide-react';
+import { Calendar, Users, Trash2, Plus, X, Save, ChevronLeft, Download, CheckSquare } from 'lucide-react';
 import './App.css';
 
 const TeatroSeatManager = () => {
@@ -195,64 +195,149 @@ const TeatroSeatManager = () => {
     }
   };
 
-  const printTickets = () => {
+  const generatePDFTickets = async () => {
     if (selectedSeats.length === 0) return;
 
-    const printWindow = window.open('', '_blank');
-    
-    const ticketsHTML = selectedSeats.map(seat => {
-      const customer = seat.customer || customerInfo;
-      return `
-        <div style="page-break-after: always; padding: 20px; border: 2px solid #000; margin: 20px; width: 400px; font-family: Arial, sans-serif;">
-          <div style="text-align: center; border-bottom: 2px dashed #000; padding-bottom: 15px; margin-bottom: 15px;">
-            <h1 style="margin: 0; font-size: 24px;">ENTRADA MATEO BOSS</h1>
-            <h2 style="margin: 5px 0; font-size: 20px;">${currentShow.name}</h2>
-          </div>
-          
-          <div style="margin: 15px 0;">
-            <p style="margin: 8px 0; font-size: 16px;"><strong>Fecha:</strong> ${currentShow.date}</p>
-            <p style="margin: 8px 0; font-size: 16px;"><strong>Hora:</strong> ${currentShow.time}</p>
-            <p style="margin: 8px 0; font-size: 16px;"><strong>Nombre:</strong> ${customer.name}</p>
-            ${customer.phone ? `<p style="margin: 8px 0; font-size: 16px;"><strong>Teléfono:</strong> ${customer.phone}</p>` : ''}
-          </div>
-          
-          <div style="margin: 20px 0; padding: 15px; background: #f0f0f0; border-radius: 8px; text-align: center;">
-            <p style="margin: 5px 0; font-size: 14px;"><strong>SECTOR:</strong> ${seat.sector === 'impar' ? 'IMPAR' : 'PAR'}</p>
-            <p style="margin: 5px 0; font-size: 24px; font-weight: bold;">FILA ${seat.row} - ASIENTO ${seat.number}</p>
-          </div>
-          
-          <div style="text-align: center; margin-top: 20px; padding-top: 15px; border-top: 2px dashed #000;">
-            <p style="margin: 5px 0; font-size: 12px; color: #666;">Conserve esta entrada</p>
-            <p style="margin: 5px 0; font-size: 12px; color: #666;">PLATEA BAJA</p>
-          </div>
-        </div>
-      `;
-    }).join('');
+    // Importar jsPDF y QR code generator desde CDN
+    const script1 = document.createElement('script');
+    script1.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+    document.head.appendChild(script1);
 
-    printWindow.document.write(`
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>Entradas - ${currentShow.name}</title>
-          <style>
-            body { margin: 0; padding: 20px; }
-            @media print {
-              body { margin: 0; }
-            }
-          </style>
-        </head>
-        <body>
-          ${ticketsHTML}
-          <script>
-            window.onload = function() {
-              window.print();
-              setTimeout(function() { window.close(); }, 100);
-            }
-          </script>
-        </body>
-      </html>
-    `);
-    printWindow.document.close();
+    const script2 = document.createElement('script');
+    script2.src = 'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js';
+    document.head.appendChild(script2);
+
+    await new Promise(resolve => {
+      script1.onload = () => {
+        script2.onload = resolve;
+      };
+    });
+
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF({
+      orientation: 'portrait',
+      unit: 'mm',
+      format: 'a4'
+    });
+
+    for (let i = 0; i < selectedSeats.length; i++) {
+      const seat = selectedSeats[i];
+      const customer = seat.customer || customerInfo;
+
+      if (i > 0) {
+        pdf.addPage();
+      }
+
+      // Fondo degradado (simulado con rectángulos)
+      pdf.setFillColor(124, 58, 237);
+      pdf.rect(0, 0, 210, 40, 'F');
+      
+      // Título
+      pdf.setTextColor(255, 255, 255);
+      pdf.setFontSize(28);
+      pdf.setFont(undefined, 'bold');
+      pdf.text('ENTRADA MATEO BOSS', 105, 20, { align: 'center' });
+      
+      pdf.setFontSize(20);
+      pdf.text(currentShow.name, 105, 32, { align: 'center' });
+
+      // Información del evento
+      pdf.setTextColor(0, 0, 0);
+      pdf.setFontSize(14);
+      pdf.setFont(undefined, 'bold');
+      
+      pdf.text('Fecha:', 20, 55);
+      pdf.setFont(undefined, 'normal');
+      pdf.text(currentShow.date, 50, 55);
+      
+      pdf.setFont(undefined, 'bold');
+      pdf.text('Hora:', 20, 65);
+      pdf.setFont(undefined, 'normal');
+      pdf.text(currentShow.time, 50, 65);
+      
+      // Información del comprador
+      pdf.setFont(undefined, 'bold');
+      pdf.text('Nombre:', 20, 80);
+      pdf.setFont(undefined, 'normal');
+      pdf.text(customer.name, 50, 80);
+      
+      if (customer.phone) {
+        pdf.setFont(undefined, 'bold');
+        pdf.text('Teléfono:', 20, 90);
+        pdf.setFont(undefined, 'normal');
+        pdf.text(customer.phone, 50, 90);
+      }
+
+      // Recuadro de asiento (destacado)
+      pdf.setFillColor(240, 240, 240);
+      pdf.roundedRect(20, 105, 170, 50, 3, 3, 'F');
+      
+      pdf.setFontSize(12);
+      pdf.setFont(undefined, 'bold');
+      pdf.text('SECTOR:', 105, 115, { align: 'center' });
+      pdf.setFontSize(16);
+      pdf.text(seat.sector === 'impar' ? 'IMPAR' : 'PAR', 105, 125, { align: 'center' });
+      
+      pdf.setFontSize(24);
+      pdf.setFont(undefined, 'bold');
+      pdf.text(`FILA ${seat.row} - ASIENTO ${seat.number}`, 105, 145, { align: 'center' });
+
+      // Generar QR Code
+      const qrData = JSON.stringify({
+        show: currentShow.id,
+        showName: currentShow.name,
+        date: currentShow.date,
+        time: currentShow.time,
+        sector: seat.sector,
+        row: seat.row,
+        seat: seat.number,
+        customer: customer.name,
+        id: `${currentShow.id}-${seat.id}`
+      });
+
+      // Crear canvas temporal para QR
+      const qrCanvas = document.createElement('canvas');
+      const QRCode = window.QRCode;
+      
+      await new Promise((resolve) => {
+        const qr = new QRCode(qrCanvas, {
+          text: qrData,
+          width: 128,
+          height: 128,
+          colorDark: '#000000',
+          colorLight: '#ffffff',
+          correctLevel: QRCode.CorrectLevel.H
+        });
+        setTimeout(resolve, 100);
+      });
+
+      const qrImage = qrCanvas.toDataURL('image/png');
+      pdf.addImage(qrImage, 'PNG', 75, 170, 60, 60);
+
+      // Texto inferior
+      pdf.setFontSize(10);
+      pdf.setFont(undefined, 'normal');
+      pdf.setTextColor(100, 100, 100);
+      pdf.text('Conserve esta entrada - Presentar en puerta', 105, 245, { align: 'center' });
+      pdf.text('PLATEA BAJA', 105, 252, { align: 'center' });
+      
+      // Código de verificación
+      pdf.setFontSize(8);
+      const verificationCode = `${currentShow.id.substring(0, 6)}-${seat.id.substring(0, 8)}`.toUpperCase();
+      pdf.text(`Código: ${verificationCode}`, 105, 260, { align: 'center' });
+
+      // Línea de corte
+      pdf.setLineDash([2, 2]);
+      pdf.setDrawColor(200, 200, 200);
+      pdf.line(10, 270, 200, 270);
+    }
+
+    // Descargar el PDF
+    const fileName = selectedSeats.length > 1 
+      ? `Entradas_${currentShow.name.replace(/\s+/g, '_')}.pdf`
+      : `Entrada_Fila${selectedSeats[0].row}_Asiento${selectedSeats[0].number}.pdf`;
+    
+    pdf.save(fileName);
   };
 
   const getSectorSeats = (sector) => {
@@ -560,17 +645,17 @@ const TeatroSeatManager = () => {
                 </button>
                 {selectedSeats[0].status === 'sold' && selectedSeats.length === 1 && (
                   <>
-                    <button onClick={printTickets} className="btn-print">
-                      <Printer size={18} />
-                      Imprimir
+                    <button onClick={generatePDFTickets} className="btn-print">
+                      <Download size={18} />
+                      Descargar PDF
                     </button>
                     <button onClick={freeSeat} className="btn-free">Liberar</button>
                   </>
                 )}
                 {selectedSeats[0].status === 'sold' && selectedSeats.length > 1 && (
-                  <button onClick={printTickets} className="btn-print">
-                    <Printer size={18} />
-                    Imprimir
+                  <button onClick={generatePDFTickets} className="btn-print">
+                    <Download size={18} />
+                    Descargar PDF
                   </button>
                 )}
                 <button onClick={() => { setSeatModal(false); setSelectedSeats([]); setMultiSelectMode(false); }} className="btn-secondary">
